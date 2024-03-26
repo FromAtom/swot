@@ -7,7 +7,7 @@ final class SwotMultiByteCharTests: XCTestCase {
             "operations": [
                 {
                     "type": "keep",
-                    "value": 6
+                    "value": 13
                 },
                 {
                     "type": "add",
@@ -29,7 +29,7 @@ final class SwotMultiByteCharTests: XCTestCase {
         }
     """
     let anotherChangeset = Changeset(operations: [
-        Keep(value: 1),
+        Keep(value: 8),
         Remove(value: 1),
         Keep(value: 2),
         Add(value: " a"),
@@ -42,7 +42,7 @@ final class SwotMultiByteCharTests: XCTestCase {
         Remove(value: 4)
     ])
     let yetAnotherChangeset = Changeset(operations: [
-        Remove(value: 4),
+        Remove(value: 11),
         Add(value: " ab"),
         Keep(value: 3),
         Remove(value: 5),
@@ -95,7 +95,7 @@ final class SwotMultiByteCharTests: XCTestCase {
             Add(value: "X")
         ])
         let changeset2 = Changeset(operations: [
-            Keep(value: 3),
+            Keep(value: 10),
             Add(value: "YZ")
         ])
 
@@ -109,7 +109,6 @@ final class SwotMultiByteCharTests: XCTestCase {
         ("testChangesetApply", testChangesetApply),
         ("testChangesetComposing", testChangesetComposing),
         ("testChangesetCombining", testChangesetCombining),
-        ("testChangeSetComposingWithMultiByteChars", testChangeSetComposingWithMultiByteChars),
+        ("testChangeSetComposingWithMultiByteChars", testChangeSetComposingWithMultiByteChars)
     ]
 }
-

@@ -52,7 +52,7 @@ public struct Changeset {
      */
     public func apply(to text: String) throws -> String {
         // Swift does not guarantee TCO (Tail Call Optimization) so going for an iterative version.
-        guard fromLength == text.count else {
+        guard fromLength == text.utf16.count else {
             throw ChangesetError.badTextLength
         }
         
@@ -61,13 +61,13 @@ public struct Changeset {
         for operation in operations {
             switch operation {
             case is Keep:
-                let newPosition = text.index(position, offsetBy: operation.length)
+                let newPosition = text.utf16.index(position, offsetBy: operation.length)
                 changedText.append(String(text[position..<newPosition]))
                 position = newPosition
             case let operation as Add:
                 changedText.append(operation.value)
             case is Remove:
-                text.formIndex(&position, offsetBy: operation.length)
+                text.utf16.formIndex(&position, offsetBy: operation.length)
             default:
                 fatalError()
             }
