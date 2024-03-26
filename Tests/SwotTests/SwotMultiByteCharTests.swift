@@ -51,7 +51,6 @@ final class SwotMultiByteCharTests: XCTestCase {
         Remove(value: 1)
     ])
 
-    // 👨‍👩‍👧.length == 8
     let baseText = "👨‍👩‍👧qwerty poiu!"
     let firstApply = "👨‍👩‍👧qwertasdfoiu!zxcv"
 
@@ -110,5 +109,6 @@ final class SwotMultiByteCharTests: XCTestCase {
         ("testChangesetApply", testChangesetApply),
         ("testChangesetComposing", testChangesetComposing),
         ("testChangesetCombining", testChangesetCombining),
+        ("testChangeSetComposingWithMultiByteChars", testChangeSetComposingWithMultiByteChars)
     ]
 }
