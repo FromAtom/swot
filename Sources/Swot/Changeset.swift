@@ -185,7 +185,7 @@ extension Changeset {
                     left.removeFirst()
                     right.removeFirst()
                 } else if l.length > r.length {
-                    let i = l.value.index(l.value.startIndex, offsetBy: l.length - r.length)
+                    let i = l.value.index(l.value.startIndex, offsetBy: r.length)
                     composedOperations.chain(Add(value: String(l.value[..<i])))
                     left.replaceFirst(by: Add(value: String(l.value[i...])))
                     right.removeFirst()
@@ -198,7 +198,7 @@ extension Changeset {
                     left.removeFirst()
                     right.removeFirst()
                 } else if l.length > r.length {
-                    let i = l.value.index(l.value.startIndex, offsetBy: l.length - r.length)
+                    let i = l.value.index(l.value.startIndex, offsetBy: r.length)
                     left.replaceFirst(by: Add(value: String(l.value[i...])))
                     right.removeFirst()
                 }
