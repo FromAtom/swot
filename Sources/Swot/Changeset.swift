@@ -1,5 +1,5 @@
 /// A collection of Operations that can be applied to a document.
-public struct Changeset {
+public struct Changeset: Sendable {
     /// Operations in the changeset.
     public let operations: [ChangesetOperation]
     

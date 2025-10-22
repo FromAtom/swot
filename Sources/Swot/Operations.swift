@@ -1,11 +1,11 @@
 /// Changeset operation
-public protocol ChangesetOperation: Codable {
+public protocol ChangesetOperation: Codable, Sendable {
     /// Operation length
     var length: Int { get }
 }
 
 
-enum OperationType: String, Codable {
+enum OperationType: String, Codable, Sendable {
     case keep
     case add
     case remove
