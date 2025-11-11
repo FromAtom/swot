@@ -223,89 +223,110 @@ extension Changeset {
         var finished = false
 
         while !finished {
-            // 1. `?? Keep(value: 0)` を削除し、nil を明示的に処理する
-            let leftOp = left.first
-            let rightOp = right.first
+            let opA = left.first // op1
+            let opB = right.first // op2
 
-            switch (leftOp, rightOp) {
+            if opA == nil && opB == nil {
+                // end condition: both ops processed
+                break
+            }
 
-                // 2. Add を優先的に処理する (ot.js と同じロジック)
-            case (let l as Add, _):
-                lPrime.chain(l)
-                rPrime.chain(Keep(value: l.length))
+            // Priority 1: Insert (Add)
+            // ot.js: [A', B'] = transform(A, B)
+            // Swot:  (B', A') = A <~> B
+            // Map: A=lhs(left), B=rhs(right), A'=rPrime, B'=lPrime
+
+            if let opA = opA as? Add { // op1 is Insert
+                rPrime.chain(opA)           // A'.insert(opA)
+                lPrime.chain(Keep(value: opA.length)) // B'.retain(opA.length)
                 left.attemptToRemoveFirst()
-            case (_, let r as Add):
-                lPrime.chain(Keep(value: r.length))
-                rPrime.chain(r)
-                right.attemptToRemoveFirst()
-
-                // 3. どちらかが nil の場合の処理 (Add ではない)
-            case (nil, nil):
-                finished = true
                 continue
-            case (nil, _): // left が空で, right が Keep か Remove
-                throw ChangesetError.unknownOperationCombination // ot.js の "first operation is too short" と同義
-            case (_, nil): // right が空で, left が Keep か Remove
-                throw ChangesetError.unknownOperationCombination // ot.js の "first operation is too long" と同義
+            }
 
-                // 4. 両方とも nil でなく、Add でもない場合のロジック
-            case (let l as Keep, let r as Keep):
-                if l.length < r.length {
-                    lPrime.chain(l)
-                    rPrime.chain(l)
-                    left.attemptToRemoveFirst()
-                    right.replaceFirst(by: Keep(value: r.length - l.length))
-                } else if l.length == r.length {
-                    lPrime.chain(l)
-                    rPrime.chain(r)
-                    left.attemptToRemoveFirst()
-                    right.attemptToRemoveFirst()
-                } else if l.length > r.length {
-                    lPrime.chain(r)
-                    rPrime.chain(r)
+            if let opB = opB as? Add { // op2 is Insert
+                rPrime.chain(Keep(value: opB.length)) // A'.retain(opB.length)
+                lPrime.chain(opB)           // B'.insert(opB)
+                right.attemptToRemoveFirst()
+                continue
+            }
+
+            // Error Handling (End of List) - after Add is handled
+            guard opA != nil else {
+                throw ChangesetError.unknownOperationCombination // ot.js: "first operation is too short"
+            }
+            guard opB != nil else {
+                throw ChangesetError.unknownOperationCombination // ot.js: "first operation is too long"
+            }
+
+            // Priority 2: Retain (Keep) / Delete (Remove)
+            switch (opA, opB) {
+            case (let l as Keep, let r as Keep): // Retain/Retain
+                let minl: Int
+                if l.length > r.length {
+                    minl = r.length
                     left.replaceFirst(by: Keep(value: l.length - r.length))
                     right.attemptToRemoveFirst()
-                }
-            case (let l as Remove, let r as Remove):
-                if l.length < r.length {
-                    left.attemptToRemoveFirst()
-                    right.replaceFirst(by: Remove(value: r.length - l.length))
                 } else if l.length == r.length {
+                    minl = r.length
                     left.attemptToRemoveFirst()
                     right.attemptToRemoveFirst()
-                } else if l.length > r.length {
+                } else { // l.length < r.length
+                    minl = l.length
+                    right.replaceFirst(by: Keep(value: r.length - l.length))
+                    left.attemptToRemoveFirst()
+                }
+                lPrime.chain(Keep(value: minl)) // B'.retain(minl)
+                rPrime.chain(Keep(value: minl)) // A'.retain(minl)
+
+            case (let l as Remove, let r as Remove): // Delete/Delete
+                if l.length > r.length { // -op1 > -op2
                     left.replaceFirst(by: Remove(value: l.length - r.length))
                     right.attemptToRemoveFirst()
-                }
-            case (let l as Keep, let r as Remove):
-                if l.length < r.length {
-                    rPrime.chain(Remove(value: l.length))
-                    left.attemptToRemoveFirst()
-                    right.replaceFirst(by: Remove(value: r.length - l.length))
                 } else if l.length == r.length {
-                    rPrime.chain(r)
                     left.attemptToRemoveFirst()
                     right.attemptToRemoveFirst()
-                } else if l.length > r.length {
-                    rPrime.chain(r)
+                } else { // l.length < r.length
+                    right.replaceFirst(by: Remove(value: r.length - l.length))
+                    left.attemptToRemoveFirst()
+                }
+                // Nothing added to lPrime or rPrime
+
+            case (let l as Remove, let r as Keep): // Delete/Retain
+                let minl: Int
+                if l.length > r.length { // -op1 > op2
+                    minl = r.length
+                    left.replaceFirst(by: Remove(value: l.length - r.length))
+                    right.attemptToRemoveFirst()
+                } else if l.length == r.length {
+                    minl = r.length
+                    left.attemptToRemoveFirst()
+                    right.attemptToRemoveFirst()
+                } else { // l.length < r.length
+                    minl = l.length
+                    right.replaceFirst(by: Keep(value: r.length - l.length))
+                    left.attemptToRemoveFirst()
+                }
+                rPrime.chain(Remove(value: minl)) // A'.delete(minl)
+
+            case (let l as Keep, let r as Remove): // Retain/Delete
+                let minl: Int
+                if l.length > r.length { // op1 > -op2
+                    minl = r.length
                     left.replaceFirst(by: Keep(value: l.length - r.length))
                     right.attemptToRemoveFirst()
-                }
-            case (let l as Remove, let r as Keep):
-                if l.length < r.length {
-                    lPrime.chain(l)
-                    left.attemptToRemoveFirst()
-                    right.replaceFirst(by: Keep(value: r.length - l.length))
                 } else if l.length == r.length {
-                    lPrime.chain(l)
+                    minl = r.length
                     left.attemptToRemoveFirst()
                     right.attemptToRemoveFirst()
-                } else if l.length > r.length {
-                    lPrime.chain(Remove(value: r.length))
-                    left.replaceFirst(by: Remove(value: l.length - r.length))
-                    right.attemptToRemoveFirst()
+                } else { // l.length < r.length
+                    minl = l.length
+                    right.replaceFirst(by: Remove(value: r.length - l.length))
+                    left.attemptToRemoveFirst()
                 }
+                lPrime.chain(Remove(value: minl)) // B'.delete(minl)
+
             default:
+                // Add が先に処理されているため、ここには到達しないはず
                 throw ChangesetError.unknownOperationCombination
             }
         }
