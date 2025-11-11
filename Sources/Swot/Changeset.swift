@@ -223,7 +223,46 @@ extension Changeset {
         var finished = false
         
         while !finished {
-            switch (left.first ?? Keep(value: 0), right.first ?? Keep(value: 0)) {
+            switch (left.first, right.first) {
+                // --- 1. どちらか、または両方が空になった場合の処理を追加 ---
+                case (nil, nil):
+                    // 両方空なら終了
+                    finished = true
+                    continue
+
+                case (let l?, nil):
+                    // right が空の場合: left の残りを処理
+                    switch l {
+                    case let op as Add:
+                        lPrime.chain(op)
+                        rPrime.chain(Keep(value: op.length))
+                    case let op as Keep:
+                        lPrime.chain(op)
+                        rPrime.chain(op)
+                    case let op as Remove:
+                        lPrime.chain(op) // lPrime の toLength は 0
+                        // rPrime は 0 (何もしない)
+                    default:
+                        throw ChangesetError.unknownOperationCombination
+                    }
+                    left.attemptToRemoveFirst()
+
+                case (nil, let r?):
+                    // left が空の場合: right の残りを処理
+                    switch r {
+                    case let op as Add:
+                        lPrime.chain(Keep(value: op.length))
+                        rPrime.chain(op)
+                    case let op as Keep:
+                        lPrime.chain(op)
+                        rPrime.chain(op)
+                    case let op as Remove:
+                        // lPrime は 0 (何もしない)
+                        rPrime.chain(op) // rPrime の toLength は 0
+                    default:
+                        throw ChangesetError.unknownOperationCombination
+                    }
+                right.attemptToRemoveFirst()
             case (let l as Add, _):
                 lPrime.chain(l)
                 rPrime.chain(Keep(value: l.length))
