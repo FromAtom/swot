@@ -2,12 +2,12 @@
 public struct Changeset: Sendable {
     /// Operations in the changeset.
     public let operations: [ChangesetOperation]
-    
+
     /// Required document length to apply this changeset.
     public var fromLength: Int { return operations.filter { !($0 is Add) }.map { $0.length }.reduce(0, +) }
     /// Document length after applying the changeset.
     public var toLength: Int { return self.operations.filter { !($0 is Remove) }.map { $0.length }.reduce(0, +) }
-    
+
     /// Possible errors when using changesets
     public enum ChangesetError: Error {
         /// Lenghts don't match.
@@ -21,15 +21,15 @@ public struct Changeset: Sendable {
         /// Trying to encode unknown operation
         case canNotEncodeUnknownOperation
     }
-    
+
     /**
      Initializes a new changeset with given Operation list.
-     
+
      Contiguous operations are combined when possible, when added to the changeset.
-     
+
      - Parameters:
-        - operations: Changeset operations
-     
+     - operations: Changeset operations
+
      - Returns: Created changeset
      */
     public init(operations: [ChangesetOperation]) {
@@ -37,17 +37,17 @@ public struct Changeset: Sendable {
         operations.forEach { chainedOperations.chain($0) }
         self.operations = chainedOperations
     }
-    
+
     /**
      Applies the changeset to given document.
-     
+
      The text length has to match the changeset's `fromLength`.
-     
+
      - Parameters:
-        - text: Document text
-     
+     - text: Document text
+
      - Throws: `ChangesetError.badTextLength` if text doesn't have the correct length
-     
+
      - Returns: Transformed text
      */
     public func apply(to text: String) throws -> String {
@@ -55,7 +55,7 @@ public struct Changeset: Sendable {
         guard fromLength == text.utf16.count else {
             throw ChangesetError.badTextLength
         }
-        
+
         var position = text.startIndex
         var changedText = ""
         for operation in operations {
@@ -83,7 +83,7 @@ extension Changeset {
     /**
      Composes the operations of both changesets. Equivalent to operator `>>>`.
      `A.compose(with: B)` is equivalent to `A >>> B`.
-     
+
      ```
      Given changesets A, B, and C,
      where C = A >>> B;
@@ -91,23 +91,23 @@ extension Changeset {
      where S = A(T) and U = B(S):
      C(T) = U
      ```
-     
+
      `toLength` of the first changeset and `fromLength` of the second one need to be equal.
-     
+
      - Parameters:
-        - other: second changeset
-     
+     - other: second changeset
+
      - Throws: `ChangesetError.uncomposableChangesets` if changesets lengths have incompatible lengths
-     
+
      - Returns: Composed changeset
      */
     public func compose(with other: Changeset) throws -> Changeset {
         return try self >>> other
     }
-    
+
     /**
      Takes two changesets to obtain complementary changesets. Equivalent to operator `<~>`.
-     
+
      ```
      Given changesets A, A', B, and B',
      where (B', A') = A <~> B;
@@ -115,32 +115,32 @@ extension Changeset {
      where S = A(T) and U = B(T):
      B'(S) = A'(U)
      ```
-     
+
      Both changesets need to have the same `fromLength`.
-     
+
      - Parameters:
-        - other: changeset to combine with
-     
+     - other: changeset to combine with
+
      - Throws: `ChangesetError.uncombinableChangesets` if changesets have incompatible lenghts
-     
+
      - Returns: The two transformed changesets
      */
     public func combine(with other: Changeset) throws -> (left: Changeset, right: Changeset) {
         return try self <~> other
     }
-    
+
     /// Compose two changesets.
     public static func >>> (lhs: Changeset, rhs: Changeset) throws -> Changeset {
         guard lhs.toLength == rhs.fromLength else { throw ChangesetError.uncomposableChangesets }
-        
+
         guard !lhs.operations.isEmpty else { return rhs }
         guard !rhs.operations.isEmpty else { return lhs }
-        
+
         var composedOperations = [ChangesetOperation]()
         var left = lhs.operations
         var right = rhs.operations
         var finished = false
-        
+
         while !finished {
             switch (left.first, right.first) {
             case (is Remove, _):
@@ -205,64 +205,31 @@ extension Changeset {
             default:
                 throw ChangesetError.unknownOperationCombination
             }
-            
+
             if left.isEmpty && right.isEmpty { finished = true }
         }
-        
+
         return Changeset(operations: composedOperations)
     }
-    
+
     /// Combine two changesets.
     public static func <~> (lhs: Changeset, rhs: Changeset) throws -> (left: Changeset, right: Changeset) {
         guard lhs.fromLength == rhs.fromLength else { throw ChangesetError.uncombinableChangesets }
-        
+
         var lPrime = [ChangesetOperation]()
         var rPrime = [ChangesetOperation]()
         var left = lhs.operations
         var right = rhs.operations
         var finished = false
-        
+
         while !finished {
-            switch (left.first, right.first) {
-                // --- 1. どちらか、または両方が空になった場合の処理を追加 ---
-                case (nil, nil):
-                    // 両方空なら終了
-                    finished = true
-                    continue
+            // 1. `?? Keep(value: 0)` を削除し、nil を明示的に処理する
+            let leftOp = left.first
+            let rightOp = right.first
 
-                case (let l?, nil):
-                    // right が空の場合: left の残りを処理
-                    switch l {
-                    case let op as Add:
-                        lPrime.chain(op)
-                        rPrime.chain(Keep(value: op.length))
-                    case let op as Keep:
-                        lPrime.chain(op)
-                        rPrime.chain(op)
-                    case let op as Remove:
-                        lPrime.chain(op) // lPrime の toLength は 0
-                        // rPrime は 0 (何もしない)
-                    default:
-                        throw ChangesetError.unknownOperationCombination
-                    }
-                    left.attemptToRemoveFirst()
+            switch (leftOp, rightOp) {
 
-                case (nil, let r?):
-                    // left が空の場合: right の残りを処理
-                    switch r {
-                    case let op as Add:
-                        lPrime.chain(Keep(value: op.length))
-                        rPrime.chain(op)
-                    case let op as Keep:
-                        lPrime.chain(op)
-                        rPrime.chain(op)
-                    case let op as Remove:
-                        // lPrime は 0 (何もしない)
-                        rPrime.chain(op) // rPrime の toLength は 0
-                    default:
-                        throw ChangesetError.unknownOperationCombination
-                    }
-                right.attemptToRemoveFirst()
+                // 2. Add を優先的に処理する (ot.js と同じロジック)
             case (let l as Add, _):
                 lPrime.chain(l)
                 rPrime.chain(Keep(value: l.length))
@@ -271,6 +238,17 @@ extension Changeset {
                 lPrime.chain(Keep(value: r.length))
                 rPrime.chain(r)
                 right.attemptToRemoveFirst()
+
+                // 3. どちらかが nil の場合の処理 (Add ではない)
+            case (nil, nil):
+                finished = true
+                continue
+            case (nil, _): // left が空で, right が Keep か Remove
+                throw ChangesetError.unknownOperationCombination // ot.js の "first operation is too short" と同義
+            case (_, nil): // right が空で, left が Keep か Remove
+                throw ChangesetError.unknownOperationCombination // ot.js の "first operation is too long" と同義
+
+                // 4. 両方とも nil でなく、Add でもない場合のロジック
             case (let l as Keep, let r as Keep):
                 if l.length < r.length {
                     lPrime.chain(l)
@@ -330,10 +308,8 @@ extension Changeset {
             default:
                 throw ChangesetError.unknownOperationCombination
             }
-            
-            if left.isEmpty && right.isEmpty { finished = true }
         }
-        
+
         return (Changeset(operations: lPrime), Changeset(operations: rPrime))
     }
 }
@@ -343,12 +319,12 @@ extension Changeset: Codable {
     private enum ChangesetCodingKeys: String, CodingKey {
         case operations
     }
-    
+
     private enum OperationCodingKeys: String, CodingKey {
         case type
         case value
     }
-    
+
     /// Decode changeset
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: ChangesetCodingKeys.self)
@@ -368,7 +344,7 @@ extension Changeset: Codable {
         }
         self.operations = decodedOperations
     }
-    
+
     /// Encode changeset
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: ChangesetCodingKeys.self)
